@@ -7,66 +7,60 @@
 #include <fstream>
 #include <sstream>
 
-static std::string loadFile(const std::string& path)
+static std::string load_file(const std::string& path)
 {
     const auto ifs = std::ifstream{path, std::ios::in | std::ios::binary};
     if (!ifs)
         throw std::runtime_error{std::format("Could not open file: {}", path)};
 
-    std::ostringstream ss;
+    auto ss = std::ostringstream{};
     ss << ifs.rdbuf();
     return ss.str();
 }
 
 int main()
 {
-    // auto latex = "x^2 + 3 = 123";
-    auto latex = R"(\\[x^2 + 3 = 123\\])";
-    bool display = true;
-
-    auto rt = JS_NewRuntime();
-    auto ctx = JS_NewContext(rt);
-    const auto bundle = loadFile("../../javascript/dist/mathjax-lite-bundle.js");
-    JS_Eval(ctx, bundle.c_str(), bundle.size(), "mathjax-lite-bundle.js", JS_EVAL_TYPE_GLOBAL);
-    const auto globalObj = JS_GetGlobalObject(ctx);
-    const auto func = JS_GetPropertyStr(ctx, globalObj, "latexToSVG");
-    if (!JS_IsFunction(ctx, func))
-    {
-        std::cerr << "latexToSVG is not a function\n";
-        JS_FreeValue(ctx, func);
-        JS_FreeValue(ctx, globalObj);
-        JS_FreeContext(ctx);
-        JS_FreeRuntime(rt);
-        return 2;
-    }
-
-    JSValue arg = JS_NewString(ctx, latex);
-    JSValue arg2 = JS_NewBool(ctx, display);
+    constexpr auto latex = "x^2 + 3 = 123";
+    constexpr auto display = false;
+    const auto js_runtime = JS_NewRuntime();
+    const auto js_context = JS_NewContext(js_runtime);
+    const auto js_library = load_file("../../javascript/dist/mathjax-lite-bundle.js");
+    JS_Eval(js_context, js_library.c_str(), js_library.size(), "mathjax-lite-js_library.js", JS_EVAL_TYPE_GLOBAL);
+    const auto js_global_object = JS_GetGlobalObject(js_context);
+    const auto js_latex_to_svg_function = JS_GetPropertyStr(js_context, js_global_object, "latexToSVG");
+    const auto arg = JS_NewString(js_context, latex);
+    const auto arg2 = JS_NewBool(js_context, display);
     JSValue argv_js[2] = { arg, arg2 };
-    JSValue result = JS_Call(ctx, func, globalObj, 2, argv_js);
+    const auto result = JS_Call(js_context, js_latex_to_svg_function, js_global_object, 2, argv_js);
     if (JS_IsException(result))
     {
-        JSValue err = JS_GetException(ctx);
-        const char *errstr = JS_ToCString(ctx, err);
-        std::cerr << "Exception: " << (errstr ? errstr : "(unknown)") << "\n";
-        if (errstr) JS_FreeCString(ctx, errstr);
-        JS_FreeValue(ctx, err);
+        const auto error = JS_GetException(js_context);
+        if (const auto error_string = JS_ToCString(js_context, error))
+        {
+            std::println(stderr, "Exception: {}", error_string);
+            JS_FreeCString(js_context, error_string);
+        }
+        else
+        {
+            std::println(stderr, "Exception: (unknown)");
+        }
+
+        JS_FreeValue(js_context, error);
     }
     else
     {
-        const char *res = JS_ToCString(ctx, result);
-        if (res)
+        if (const auto response = JS_ToCString(js_context, result))
         {
-            std::cout << res << std::endl;
-            JS_FreeCString(ctx, res);
+            std::println("{}", response);
+            JS_FreeCString(js_context, response);
         }
     }
 
-    JS_FreeValue(ctx, result);
-    JS_FreeValue(ctx, func);
-    JS_FreeValue(ctx, globalObj);
-    JS_FreeContext(ctx);
-    JS_FreeRuntime(rt);
+    JS_FreeValue(js_context, result);
+    JS_FreeValue(js_context, js_latex_to_svg_function);
+    JS_FreeValue(js_context, js_global_object);
+    JS_FreeContext(js_context);
+    JS_FreeRuntime(js_runtime);
 
     return 0;
 }
