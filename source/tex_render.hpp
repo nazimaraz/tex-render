@@ -19,9 +19,11 @@ public:
     static void destroy();
 
     static std::optional<std::string> latex_to_svg(const std::string& latex);
-    // static std::optional<std::string> latex_to_svg_file(const std::string& latex);
-    // static std::optional<std::string> latex_file_to_svg(const std::string& latex);
-    // static std::optional<std::string> latex_file_to_svg_file(const std::string& latex);
+    static void latex_to_svg_file(const std::string& latex);
+    static void latex_to_svg_file(const std::string& latex, const std::string& output_svg_file);
+    static std::optional<std::string> latex_file_to_svg(const std::string& input_latex_file);
+    static void latex_file_to_svg_file(const std::string& input_latex_file);
+    static void latex_file_to_svg_file(const std::string& input_latex_file, const std::string& output_svg_file);
 
     // static std::optional<std::string> latex_to_png(const std::string& latex);
     // static std::optional<std::string> latex_file_to_png(const std::string& latex);

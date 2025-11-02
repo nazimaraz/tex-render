@@ -27,6 +27,7 @@ static std::string load_file(const std::string& path)
 void tex_render::initialize()
 {
     js_runtime_ = JS_NewRuntime();
+    JS_SetMaxStackSize(js_runtime_, 2 * 1024 * 1024);
     js_context_ = JS_NewContext(js_runtime_);
     const auto js_library = load_file("../../javascript/dist/mathjax-lite-bundle.js");
     JS_Eval(js_context_, js_library.c_str(), js_library.size(), "mathjax-lite-js_library.js", JS_EVAL_TYPE_GLOBAL);
@@ -66,13 +67,70 @@ std::optional<std::string> tex_render::latex_to_svg(const std::string& latex)
         return {};
     }
 
-    if (const auto response = JS_ToCString(js_context_, result))
+    if (const auto raw_response = JS_ToCString(js_context_, result))
     {
-        JS_FreeCString(js_context_, response);
+        const auto response = std::string{raw_response};
+        JS_FreeCString(js_context_, raw_response);
         JS_FreeValue(js_context_, result);
         return response;
     }
 
     JS_FreeValue(js_context_, result);
     return std::string{};
+}
+
+void tex_render::latex_to_svg_file(const std::string& latex)
+{
+    latex_to_svg_file(latex, "output");
+}
+
+void tex_render::latex_to_svg_file(const std::string& latex, const std::string& output_svg_file)
+{
+    const auto svg = latex_to_svg(latex);
+    if (!svg)
+        return;
+
+    auto file = std::ofstream{std::format("{}.svg", output_svg_file)};
+    if (!file.is_open())
+    {
+        std::println(stderr, "Unable to open file for writing");
+        return;
+    }
+
+    file << *svg;
+    file.close();
+    std::println("File {}.svg written successfully", output_svg_file);
+}
+
+std::optional<std::string> tex_render::latex_file_to_svg(const std::string& input_latex_file)
+{
+    const auto file = std::ifstream{input_latex_file};
+    if (!file)
+    {
+        std::println(stderr, "Unable to open file for writing");
+        return {};
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return latex_to_svg(buffer.str());
+}
+
+void tex_render::latex_file_to_svg_file(const std::string& input_latex_file)
+{
+    latex_file_to_svg_file(input_latex_file, "output");
+}
+
+void tex_render::latex_file_to_svg_file(const std::string& input_latex_file, const std::string& output_svg_file)
+{
+    const auto file = std::ifstream{input_latex_file};
+    if (!file)
+    {
+        std::println(stderr, "Unable to open file for writing");
+        return;
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    latex_to_svg_file(buffer.str(), output_svg_file);
 }
